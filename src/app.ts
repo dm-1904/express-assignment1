@@ -1,7 +1,19 @@
 import express from "express";
 import { prisma } from "../prisma/prisma-instance";
 import { errorHandleMiddleware } from "./error-handler";
+import HttpStatusCode from "./status-codes";
 import "express-async-errors";
+import { ok } from "assert";
+
+const {
+  OK,
+  BAD_REQUEST,
+  UNAUTHORIZED,
+  CREATED,
+  INTERNAL_SERVER_ERROR,
+  NOT_FOUND,
+  NO_CONTENT,
+} = HttpStatusCode;
 
 const app = express();
 app.use(express.json());
@@ -9,19 +21,19 @@ app.use(express.json());
 // get, delete, post, patch
 
 app.get("/", (req, res) => {
-  res.status(200).json({ message: "Hello World!" });
+  res.status(OK).json({ message: "Hello World!" });
 });
 
 app.get("/dogs", async (req, res) => {
   const dogs = await prisma.dog.findMany();
-  res.send(dogs);
+  res.status(OK).send(dogs);
 });
 
 app.get("/dogs/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res
-      .status(400)
+      .status(BAD_REQUEST)
       .json({ message: "id should be a number" });
   }
   try {
@@ -29,13 +41,13 @@ app.get("/dogs/:id", async (req, res) => {
       where: { id },
     });
     if (!dog) {
-      return res.sendStatus(204);
+      return res.sendStatus(NO_CONTENT);
     }
-    return res.status(200).json(dog);
+    return res.status(OK).json(dog);
   } catch (err) {
     console.error(err);
     return res
-      .status(500)
+      .status(INTERNAL_SERVER_ERROR)
       .json({ error: "failed to fetch dog" });
   }
 });
@@ -44,7 +56,7 @@ app.delete("/dogs/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res
-      .status(400)
+      .status(BAD_REQUEST)
       .json({ message: "id should be a number" });
   }
   try {
@@ -53,7 +65,7 @@ app.delete("/dogs/:id", async (req, res) => {
         id,
       },
     });
-    res.status(200).json(deletedDog);
+    res.status(OK).json(deletedDog);
   } catch (err) {
     if (
       (err as { code?: string })?.code === "P2025" ||
@@ -61,17 +73,17 @@ app.delete("/dogs/:id", async (req, res) => {
         "Record to delete does not exist"
       )
     ) {
-      return res.sendStatus(204);
+      return res.sendStatus(NO_CONTENT);
     }
     console.error(err);
     return res
-      .status(500)
+      .status(INTERNAL_SERVER_ERROR)
       .json({ error: "failed to delete dog" });
   }
 });
 
 app.post("/dogs", async (req, res) => {
-  const body = req.body;
+  const { name, age, description, breed } = req.body;
   const errors: string[] = [];
   const allowedKeys = [
     "name",
@@ -79,11 +91,8 @@ app.post("/dogs", async (req, res) => {
     "breed",
     "age",
   ];
-  const name = body?.name;
-  const age = body?.age;
-  const description = body?.description;
 
-  for (const key of Object.keys(body)) {
+  for (const key of Object.keys(req.body)) {
     if (!allowedKeys.includes(key)) {
       errors.push(`'${key}' is not a valid key`);
     }
@@ -104,16 +113,16 @@ app.post("/dogs", async (req, res) => {
   try {
     const newDog = await prisma.dog.create({
       data: {
-        name: body?.name,
-        age: body?.age,
-        description: body?.description,
-        breed: body?.breed ?? null,
+        name,
+        age,
+        description,
+        breed,
       },
     });
-    res.status(201).json(newDog);
+    res.status(CREATED).json(newDog);
   } catch (e) {
     console.error(e);
-    res.status(500);
+    res.status(INTERNAL_SERVER_ERROR);
   }
 });
 
@@ -121,7 +130,7 @@ app.patch("/dogs/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isFinite(id)) {
     return res
-      .status(400)
+      .status(BAD_REQUEST)
       .json({ message: "id should be a number" });
   }
   const allowedKeys = [
@@ -139,7 +148,7 @@ app.patch("/dogs/:id", async (req, res) => {
     }
   }
   if (errors.length) {
-    return res.status(400).json({ errors });
+    return res.status(BAD_REQUEST).json({ errors });
   }
   const data = Object.fromEntries(
     Object.entries(body).filter(([k]) =>
@@ -151,14 +160,14 @@ app.patch("/dogs/:id", async (req, res) => {
       where: { id },
       data,
     });
-    return res.status(201).json(updatedDog);
+    return res.status(CREATED).json(updatedDog);
   } catch (err) {
     if ((err as { code?: string })?.code === "P2025") {
-      return res.sendStatus(204);
+      return res.sendStatus(NO_CONTENT);
     }
     console.error(err);
     return res
-      .status(500)
+      .status(INTERNAL_SERVER_ERROR)
       .json({ error: "failed to update dog" });
   }
 });
