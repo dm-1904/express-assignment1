@@ -3,15 +3,12 @@ import { prisma } from "../prisma/prisma-instance";
 import { errorHandleMiddleware } from "./error-handler";
 import HttpStatusCode from "./status-codes";
 import "express-async-errors";
-import { ok } from "assert";
 
 const {
   OK,
   BAD_REQUEST,
-  UNAUTHORIZED,
   CREATED,
   INTERNAL_SERVER_ERROR,
-  NOT_FOUND,
   NO_CONTENT,
 } = HttpStatusCode;
 
@@ -108,7 +105,7 @@ app.post("/dogs", async (req, res) => {
     errors.push("age should be a number");
   }
   if (errors.length) {
-    return res.status(400).json({ errors });
+    return res.status(BAD_REQUEST).json({ errors });
   }
   try {
     const newDog = await prisma.dog.create({
@@ -160,7 +157,7 @@ app.patch("/dogs/:id", async (req, res) => {
       where: { id },
       data,
     });
-    return res.status(CREATED).json(updatedDog);
+    return res.status(OK).json(updatedDog);
   } catch (err) {
     if ((err as { code?: string })?.code === "P2025") {
       return res.sendStatus(NO_CONTENT);
